@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-xray-sdk-go/instrumentation/awsv2"
 )
 
 func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -20,7 +21,9 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 	}
 
 	// Create an SQS client
-	cfg, _ := config.LoadDefaultConfig(context.Background())
+	cfg, _ := config.LoadDefaultConfig(ctx)
+
+	awsv2.AWSV2Instrumentor(&cfg.APIOptions)
 
 	sqsClient := sqs.NewFromConfig(cfg)
 

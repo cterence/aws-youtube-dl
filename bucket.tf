@@ -1,10 +1,5 @@
 resource "aws_s3_bucket" "this" {
-  bucket = "sls-youtube-downloader"
-}
-
-resource "aws_s3_bucket_acl" "this" {
-  bucket = aws_s3_bucket.this.id
-  acl    = "public-read"
+  bucket = "downloaded-youtube-videos"
 }
 
 data "aws_iam_policy_document" "s3_bucket_policy" {
@@ -23,7 +18,7 @@ data "aws_iam_policy_document" "s3_bucket_policy" {
     ]
 
     resources = [
-      "arn:aws:s3:::sls-youtube-downloader/*",
+      "arn:aws:s3:::downloaded-youtube-videos/*",
     ]
   }
 }
@@ -31,4 +26,17 @@ data "aws_iam_policy_document" "s3_bucket_policy" {
 resource "aws_s3_bucket_policy" "this" {
   bucket = aws_s3_bucket.this.id
   policy = data.aws_iam_policy_document.s3_bucket_policy.json
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    id     = "delete-all"
+    status = "Enabled"
+
+    expiration {
+      days = 1
+    }
+  }
 }

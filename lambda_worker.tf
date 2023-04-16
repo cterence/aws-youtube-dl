@@ -14,10 +14,46 @@ data "aws_iam_policy_document" "worker_assume_role" {
 data "aws_iam_policy_document" "worker_lambda" {
   statement {
     effect = "Allow"
+    resources = [
+      aws_s3_bucket.this.arn,
+      "${aws_s3_bucket.this.arn}/*",
+    ]
+    actions = [
+      "s3:PutObject*",
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+  }
 
-    resources = ["*"]
+  statement {
+    effect    = "Allow"
+    resources = [aws_sqs_queue.video_download_queue.arn]
+    actions = [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+    ]
+  }
 
-    actions = ["s3:*", "sqs:*", "sns:*", "logs:*"]
+  statement {
+    effect    = "Allow"
+    resources = [aws_sns_topic.upload_notification.arn]
+    actions   = ["sns:Publish"]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["arn:aws:logs:${local.region}:${local.account_id}:*"]
+    actions   = ["logs:CreateLogGroup"]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/*"]
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
   }
 }
 
@@ -52,19 +88,21 @@ data "archive_file" "worker_lambda" {
 }
 
 resource "aws_lambda_function" "worker_lambda" {
-  filename      = "./code/worker/main.zip"
-  function_name = "worker"
-  role          = aws_iam_role.worker_lambda.arn
-  handler       = "main"
-  timeout       = 600
-
+  filename         = "./code/worker/main.zip"
+  function_name    = "worker"
+  role             = aws_iam_role.worker_lambda.arn
+  handler          = "main"
+  timeout          = 600
+  runtime          = "go1.x"
   source_code_hash = data.archive_file.worker_lambda.output_base64sha256
 
-  runtime = "go1.x"
+  tracing_config {
+    mode = "Active"
+  }
 
   environment {
     variables = {
-      BUCKET_NAME = aws_s3_bucket.this.name
+      BUCKET_NAME = aws_s3_bucket.this.bucket
       QUEUE_URL   = aws_sqs_queue.video_download_queue.url
       TOPIC_ARN   = aws_sns_topic.upload_notification.arn
     }
